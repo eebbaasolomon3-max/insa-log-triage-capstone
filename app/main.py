@@ -1,4 +1,6 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import joblib
 import pandas as pd
@@ -44,10 +46,14 @@ def explain_alert(log_template, log_component):
     else:
         return "Explanation: No specific policy rule matches this anomaly. Analyst investigation required."
 
-@app.get("/")
-def read_root():
-    return {"status": "Online", "message": "INSA Log Triage API is running"}
+# --- FRONTEND SERVING ---
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
+@app.get("/")
+def serve_frontend():
+    return FileResponse("app/static/index.html")
+
+# --- API ENDPOINT ---
 @app.post("/predict")
 def predict_anomaly(log: LogEntry):
     try:
