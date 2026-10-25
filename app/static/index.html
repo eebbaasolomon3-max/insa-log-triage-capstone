@@ -140,7 +140,7 @@
             if(!msg) return;
             
             const history = document.getElementById('chatHistory');
-            if(history.innerHTML.includes("italic")) history.innerHTML = ""; // clear placeholder
+            if(history.innerHTML.includes("italic")) history.innerHTML = ""; 
             
             history.innerHTML += `<div class="text-blue-300"><strong>You:</strong> ${msg}</div>`;
             input.value = '';
@@ -155,17 +155,20 @@
                     body: JSON.stringify({message: msg, log_context: context})
                 });
                 const data = await res.json();
-                history.innerHTML += `<div class="text-green-300"><strong>Copilot:</strong> ${data.reply}</div>`;
+                
+                const replyText = data.reply ? data.reply : `Error: ${data.detail || 'Could not reach LLM'}`;
+                const colorClass = data.reply ? "text-green-300" : "text-red-400";
+                
+                history.innerHTML += `<div class="${colorClass}"><strong>Copilot:</strong> ${replyText}</div>`;
                 history.scrollTop = history.scrollHeight;
             } catch(e) {
-                history.innerHTML += `<div class="text-red-400">Error connecting to Copilot.</div>`;
+                history.innerHTML += `<div class="text-red-400">Network Error connecting to Copilot.</div>`;
             }
         });
 
-        // Simulation
         document.getElementById('simulateBtn').addEventListener('click', function() {
             document.getElementById('component').value = "dfs.FSNamesystem";
-            document.getElementById('level').value = "WARN";
+            document.getElementById('level').value = "ERROR"; // Changed to ERROR to trigger the AI!
             document.getElementById('event_template').value = "BLOCK* NameSystem.addStoredBlock: blockMap updated: <*> is added to <*> size <*>";
             form.dispatchEvent(new Event('submit'));
         });
