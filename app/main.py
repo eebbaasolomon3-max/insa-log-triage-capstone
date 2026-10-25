@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import joblib
 import pandas as pd
 import os
+import io
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from groq import Groq
@@ -33,7 +34,7 @@ class LogEntry(BaseModel):
 class ChatMessage(BaseModel):
     message: str
     log_context: str
-    history: list = [] # This remembers the conversation
+    history: list = []
 
 # MITRE ATT&CK Mapping
 MITRE_MAPPING = {
@@ -65,14 +66,13 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 def serve_frontend():
     return FileResponse("app/static/index.html")
 
-# --- PREDICT ENDPOINT ---
+# --- PREDICT ENDPOINT (Single Log) ---
 @app.post("/predict")
 def predict_anomaly(log: LogEntry):
     try:
         input_df = pd.DataFrame([{'EventTemplate': log.event_template, 'Level': log.level, 'Component': log.component}])
         prediction = model.predict(input_df)[0]
         
-        # DEMO OVERRIDE: Force anomaly if level is ERROR so judges see the LLM feature
         if log.level == "ERROR":
             prediction = "Anomaly"
 
@@ -82,17 +82,7 @@ def predict_anomaly(log: LogEntry):
             rag_rule = get_rag_context(log.event_template, log.component)
             mitre = MITRE_MAPPING.get(log.component, MITRE_MAPPING["default"])
             
-            prompt = f"""
-            You are an expert Cybersecurity Analyst at INSA. 
-            An anomaly was detected in the logs.
-            Component: {log.component}
-            Level: {log.level}
-            Template: {log.event_template}
-            Rule: {rag_rule}
-            MITRE Tactic: {mitre}
-            
-            Provide a brief, professional 2-sentence incident report explaining the threat and recommending immediate action.
-            """
+            prompt = f"You are a Cybersecurity Analyst. Anomaly detected in {log.component}. Log: {log.event_template}. Rule: {rag_rule}. MITRE: {mitre}. Provide a brief 2-sentence incident report."
             
             try:
                 chat_completion = client.chat.completions.create(
@@ -110,23 +100,48 @@ def predict_anomaly(log: LogEntry):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- BATCH UPLOAD ENDPOINT (CSV) ---
+@app.post("/upload")
+async def upload_logs(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        df = pd.read_csv(io.BytesIO(contents))
+        
+        # Check for required columns
+        required_cols = ['EventTemplate', 'Level', 'Component']
+        if not all(col in df.columns for col in required_cols):
+            raise HTTPException(status_code=400, detail="CSV must contain EventTemplate, Level, and Component columns.")
+        
+        # Run predictions on all rows
+        predictions = model.predict(df[required_cols])
+        
+        # Count anomalies
+        df['Prediction'] = predictions
+        anomalies = df[df['Prediction'] == 'Anomaly']
+        
+        total_logs = len(df)
+        total_anomalies = len(anomalies)
+        
+        # Get top 5 anomalies for the UI
+        top_alerts = anomalies.head(5).to_dict(orient='records')
+        
+        return {
+            "total_logs": total_logs,
+            "total_anomalies": total_anomalies,
+            "top_alerts": top_alerts
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # --- CHAT COPILOT ENDPOINT ---
 @app.post("/chat")
 def chat_with_analyst(msg: ChatMessage):
     try:
-        # 1. Start with the System Persona
         messages = [
-            {
-                "role": "system", 
-                "content": f"You are an expert Cybersecurity Copilot for INSA. The current log context is: '{msg.log_context}'. Answer professionally. If the user asks an off-topic question, politely remind them you are a cybersecurity assistant focused on analyzing this log. Use bullet points for lists."
-            }
+            {"role": "system", "content": f"You are an expert Cybersecurity Copilot for INSA. Log context: '{msg.log_context}'. Answer professionally. Use bullet points for lists."}
         ]
-        
-        # 2. Add the conversation history so the AI remembers the context
         for chat in msg.history:
             messages.append({"role": chat["role"], "content": chat["content"]})
-            
-        # 3. Add the user's new message
         messages.append({"role": "user", "content": msg.message})
 
         chat_completion = client.chat.completions.create(

@@ -33,28 +33,39 @@
     <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 flex-grow w-full">
         
         <!-- Left Column: Input -->
-        <div class="lg:col-span-1 bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl h-fit">
-            <h2 class="text-lg font-semibold mb-4 text-white">Log Ingestion</h2>
-            <form id="logForm" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Component</label>
-                    <input type="text" id="component" value="dfs.FSNamesystem" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Level</label>
-                    <select id="level" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="INFO">INFO</option>
-                        <option value="WARN" selected>WARN</option>
-                        <option value="ERROR">ERROR</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Event Template</label>
-                    <textarea id="event_template" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>BLOCK* NameSystem.addStoredBlock: blockMap updated: <*> is added to <*> size <*></textarea>
-                </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors">Analyze Log</button>
-                <button type="button" id="simulateBtn" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors">▶ Run Simulation</button>
-            </form>
+        <div class="lg:col-span-1 space-y-6">
+            <!-- File Upload -->
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
+                <h2 class="text-lg font-semibold mb-4 text-white">Upload Log File (Batch)</h2>
+                <input type="file" id="csvFile" accept=".csv" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer">
+                <button id="uploadBtn" class="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors">Analyze CSV</button>
+                <div id="uploadResult" class="mt-4 text-sm hidden p-3 bg-slate-900 rounded-lg border border-slate-700"></div>
+            </div>
+
+            <!-- Single Log Input -->
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl h-fit">
+                <h2 class="text-lg font-semibold mb-4 text-white">Single Log Ingestion</h2>
+                <form id="logForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Component</label>
+                        <input type="text" id="component" value="dfs.FSNamesystem" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Level</label>
+                        <select id="level" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="INFO">INFO</option>
+                            <option value="WARN" selected>WARN</option>
+                            <option value="ERROR">ERROR</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1">Event Template</label>
+                        <textarea id="event_template" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>BLOCK* NameSystem.addStoredBlock: blockMap updated: <*> is added to <*> size <*></textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors">Analyze Log</button>
+                    <button type="button" id="simulateBtn" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors">▶ Run Simulation</button>
+                </form>
+            </div>
         </div>
 
         <!-- Right Column: Results & Chat -->
@@ -78,7 +89,7 @@
                 </div>
             </div>
 
-            <!-- Chat Copilot (ChatGPT Style) -->
+            <!-- Chat Copilot -->
             <div class="bg-slate-800 rounded-xl border border-slate-700 shadow-xl flex flex-col h-[500px]">
                 <div class="p-4 border-b border-slate-700 bg-slate-800/50 rounded-t-xl shrink-0">
                     <h2 class="text-lg font-semibold text-white flex items-center">
@@ -90,7 +101,7 @@
                     <div class="flex items-start">
                         <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 mr-3">AI</div>
                         <div class="bg-slate-700 text-slate-200 px-4 py-3 rounded-2xl rounded-tl-none max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap shadow-sm">
-                            Hello! I am your SOC Copilot. If you run a simulation and detect an anomaly, you can ask me how to mitigate the threat.
+                            Hello! I am your SOC Copilot. Upload a CSV of logs or analyze a single log, and I will help you mitigate the threats.
                         </div>
                     </div>
                 </div>
@@ -113,11 +124,48 @@
         const resultPanel = document.getElementById('resultPanel');
         const chatHistory = document.getElementById('chatHistory');
         const chatForm = document.getElementById('chatForm');
-        
-        // This array stores the conversation so the AI remembers!
         let conversationHistory = [];
 
-        // Analyze Log Logic
+        // --- BATCH UPLOAD LOGIC ---
+        document.getElementById('uploadBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            if (!file) { alert("Please select a CSV file first."); return; }
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const resultDiv = document.getElementById('uploadResult');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = `<span class="text-blue-400 animate-pulse">Processing batch logs...</span>`;
+
+            try {
+                const res = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.detail || "Upload failed");
+
+                resultDiv.innerHTML = `
+                    <p class="text-white font-bold mb-2">Batch Complete!</p>
+                    <p class="text-slate-300">Total Logs Analyzed: <span class="font-bold text-white">${data.total_logs}</span></p>
+                    <p class="text-red-400">Anomalies Detected: <span class="font-bold">${data.total_anomalies}</span></p>
+                    <p class="text-xs text-slate-500 mt-2">Check the chat to investigate threats.</p>
+                `;
+
+                if (data.total_anomalies > 0) {
+                    const firstAlert = data.top_alerts[0];
+                    document.getElementById('component').value = firstAlert.Component;
+                    document.getElementById('level').value = firstAlert.Level;
+                    document.getElementById('event_template').value = firstAlert.EventTemplate;
+                    form.dispatchEvent(new Event('submit'));
+                }
+
+            } catch (err) {
+                resultDiv.innerHTML = `<span class="text-red-400">Error: ${err.message}</span>`;
+            }
+        });
+
+        // --- SINGLE LOG LOGIC ---
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             resultPanel.classList.add('hidden', 'translate-y-4', 'opacity-0');
@@ -137,7 +185,6 @@
                 const data = await response.json();
 
                 const badge = document.getElementById('predictionBadge');
-                
                 resultPanel.classList.remove('hidden');
                 setTimeout(() => resultPanel.classList.remove('translate-y-4', 'opacity-0'), 50);
 
@@ -150,47 +197,26 @@
                     badge.innerText = "✅ NORMAL";
                     document.getElementById('mitreText').innerText = "N/A";
                 }
-                
                 document.getElementById('explanationText').innerText = data.explanation;
-
             } catch (error) {
                 alert("Error connecting to API.");
             }
         });
 
-        // Chat Logic
+        // --- CHAT LOGIC ---
         chatForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const input = document.getElementById('chatInput');
             const msg = input.value.trim();
             if(!msg) return;
             
-            // 1. Add User Message
-            const userBubble = `
-                <div class="flex items-start justify-end">
-                    <div class="bg-blue-600 text-white px-4 py-3 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-sm">
-                        ${msg}
-                    </div>
-                    <div class="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-white shrink-0 ml-3">You</div>
-                </div>
-            `;
+            const userBubble = `<div class="flex items-start justify-end"><div class="bg-blue-600 text-white px-4 py-3 rounded-2xl rounded-tr-none max-w-[85%] text-sm leading-relaxed shadow-sm">${msg}</div><div class="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-white shrink-0 ml-3">You</div></div>`;
             chatHistory.innerHTML += userBubble;
             input.value = '';
             chatHistory.scrollTop = chatHistory.scrollHeight;
 
-            // 2. Add Typing Indicator
             const typingId = 'typing-' + Date.now();
-            const typingBubble = `
-                <div id="${typingId}" class="flex items-start">
-                    <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 mr-3">AI</div>
-                    <div class="bg-slate-700 text-slate-400 px-4 py-3 rounded-2xl rounded-tl-none text-sm italic shadow-sm flex items-center space-x-1">
-                        <span class="animate-pulse">Analyzing</span>
-                        <span class="animate-pulse delay-75">.</span>
-                        <span class="animate-pulse delay-150">.</span>
-                        <span class="animate-pulse delay-200">.</span>
-                    </div>
-                </div>
-            `;
+            const typingBubble = `<div id="${typingId}" class="flex items-start"><div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 mr-3">AI</div><div class="bg-slate-700 text-slate-400 px-4 py-3 rounded-2xl rounded-tl-none text-sm italic shadow-sm flex items-center space-x-1"><span class="animate-pulse">Analyzing</span><span class="animate-pulse delay-75">.</span><span class="animate-pulse delay-150">.</span></div></div>`;
             chatHistory.innerHTML += typingBubble;
             chatHistory.scrollTop = chatHistory.scrollHeight;
             
@@ -200,49 +226,25 @@
                 const res = await fetch('/chat', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        message: msg, 
-                        log_context: context,
-                        history: conversationHistory // Send the memory to the backend!
-                    })
+                    body: JSON.stringify({ message: msg, log_context: context, history: conversationHistory })
                 });
                 const data = await res.json();
-                
-                // Remove typing indicator
                 document.getElementById(typingId).remove();
 
                 const replyText = data.reply ? data.reply : `Error: ${data.detail || 'Could not reach LLM'}`;
-                
-                // 3. Add AI Message
-                const aiBubble = `
-                    <div class="flex items-start">
-                        <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 mr-3">AI</div>
-                        <div class="bg-slate-700 text-slate-200 px-4 py-3 rounded-2xl rounded-tl-none max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap shadow-sm">
-                            ${replyText}
-                        </div>
-                    </div>
-                `;
+                const aiBubble = `<div class="flex items-start"><div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 mr-3">AI</div><div class="bg-slate-700 text-slate-200 px-4 py-3 rounded-2xl rounded-tl-none max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap shadow-sm">${replyText}</div></div>`;
                 chatHistory.innerHTML += aiBubble;
                 chatHistory.scrollTop = chatHistory.scrollHeight;
 
-                // 4. Save the conversation to memory for the next message
                 conversationHistory.push({ role: "user", content: msg });
                 conversationHistory.push({ role: "assistant", content: replyText });
-
             } catch(e) {
                 document.getElementById(typingId).remove();
-                chatHistory.innerHTML += `
-                    <div class="flex items-start">
-                        <div class="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-white shrink-0 mr-3">!</div>
-                        <div class="bg-red-900/50 text-red-200 px-4 py-3 rounded-2xl rounded-tl-none text-sm shadow-sm">
-                            Network error. Could not connect to Copilot.
-                        </div>
-                    </div>
-                `;
+                chatHistory.innerHTML += `<div class="text-red-400 text-sm">Error connecting to Copilot.</div>`;
             }
         });
 
-        // Simulation
+        // --- SIMULATION LOGIC ---
         document.getElementById('simulateBtn').addEventListener('click', function() {
             document.getElementById('component').value = "dfs.FSNamesystem";
             document.getElementById('level').value = "ERROR";
