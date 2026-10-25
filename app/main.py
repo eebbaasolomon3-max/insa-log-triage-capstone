@@ -1,0 +1,74 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import joblib
+import pandas as pd
+import os
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+app = FastAPI(title="INSA Log Triage API", description="Anomaly detection and RAG explanation API")
+
+# 1. Load the trained model on startup
+MODEL_PATH = "models/baseline_rf_pipeline.pkl"
+if os.path.exists(MODEL_PATH):
+    model = joblib.load(MODEL_PATH)
+else:
+    raise RuntimeError(f"Model not found at {MODEL_PATH}. Please ensure you have trained and saved the model.")
+
+# 2. Define the expected input format using Pydantic
+class LogEntry(BaseModel):
+    component: str
+    level: str
+    event_template: str
+
+# 3. The Knowledge Base for RAG
+knowledge_base = [
+    "Rule 1: A high volume of 'DataNode' logs with 'PacketResponder' terminated signals often indicates a network disconnection or a failing hard drive.",
+    "Rule 2: 'WARN' or 'ERROR' levels in the 'dfs.FSNamesystem' component usually point to a corrupted block or a NameNode failure.",
+    "Rule 3: Repeated 'BLOCK* NameSystem.addStoredBlock' logs from the same IP within seconds is a potential denial-of-service attack.",
+    "Rule 4: If the anomaly involves an unauthorized user, refer to the INSA Access Control Policy section 4.2."
+]
+
+def explain_alert(log_template, log_component):
+    query = f"{log_component} {log_template}"
+    vectorizer = TfidfVectorizer(stop_words='english')
+    kb_vectors = vectorizer.fit_transform(knowledge_base)
+    query_vector = vectorizer.transform([query])
+    
+    similarities = cosine_similarity(query_vector, kb_vectors)[0]
+    best_match_idx = similarities.argmax()
+    best_score = similarities[best_match_idx]
+    
+    if best_score > 0.1:
+        return f"Explanation: {knowledge_base[best_match_idx]} (Confidence: {best_score:.2f})"
+    else:
+        return "Explanation: No specific policy rule matches this anomaly. Analyst investigation required."
+
+@app.get("/")
+def read_root():
+    return {"status": "Online", "message": "INSA Log Triage API is running"}
+
+@app.post("/predict")
+def predict_anomaly(log: LogEntry):
+    try:
+        # Format input for the model
+        input_df = pd.DataFrame([{
+            'EventTemplate': log.event_template,
+            'Level': log.level,
+            'Component': log.component
+        }])
+        
+        # Predict
+        prediction = model.predict(input_df)[0]
+        
+        # Get explanation if it's an anomaly
+        explanation = "N/A"
+        if prediction == 'Anomaly':
+            explanation = explain_alert(log.event_template, log.component)
+            
+        return {
+            "prediction": prediction,
+            "explanation": explanation
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
