@@ -114,11 +114,12 @@ def predict_anomaly(log: LogEntry):
 def chat_with_analyst(msg: ChatMessage):
     try:
         prompt = f"""
-        You are a helpful Cybersecurity Copilot for INSA. 
-        The user is investigating an anomaly with this context: "{msg.log_context}"
-        The user asks: "{msg.message}"
-        Answer concisely and professionally.
-        """
+	You are a helpful Cybersecurity Copilot for INSA. 
+	The user is investigating an anomaly with this context: "{msg.log_context}"
+	The user asks: "{msg.message}"
+	Answer concisely and professionally. 
+	Use bullet points for lists. Do NOT use markdown tables.
+	"""
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             model="openai/gpt-oss-20b",
