@@ -1,8 +1,7 @@
-## 🌐 Live Demo
-👉 **[Click here to test the Live Interactive Dashboard](https://insa-log-triage-capstone.onrender.com)** 👈
-
 # 🛡️ INSA AI Engineering Capstone: Log Anomaly Detection & Alert Triage
-**Student:** Eba Solomon | **Program:** INSA Summer Camp, 5th Batch
+*
+## 🌐 Live Demo
+👉 **[Click here to test the Live Interactive SOC Dashboard](https://insa-log-triage-capstone.onrender.com)** 👈*Student:** Eba Solomon | **Program:** INSA Summer Camp, 5th Batch
 
 An end-to-end MLOps pipeline that detects anomalies in HDFS system logs and uses Retrieval-Augmented Generation (RAG) to explain *why* an alert was triggered, reducing analyst alert fatigue.
 
