@@ -7,74 +7,118 @@ import pandas as pd
 import os
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from groq import Groq
+from dotenv import load_dotenv
 
-app = FastAPI(title="INSA Log Triage API", description="Anomaly detection and RAG explanation API")
+# Load environment variables (API Key)
+load_dotenv()
 
-# 1. Load the trained model on startup
+app = FastAPI(title="INSA SOC Copilot API")
+
+# Initialize Groq Client
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+# Load Model
 MODEL_PATH = "models/baseline_rf_pipeline.pkl"
 if os.path.exists(MODEL_PATH):
     model = joblib.load(MODEL_PATH)
 else:
-    raise RuntimeError(f"Model not found at {MODEL_PATH}. Please ensure you have trained and saved the model.")
+    raise RuntimeError(f"Model not found at {MODEL_PATH}")
 
-# 2. Define the expected input format using Pydantic
 class LogEntry(BaseModel):
     component: str
     level: str
     event_template: str
 
-# 3. The Knowledge Base for RAG
+class ChatMessage(BaseModel):
+    message: str
+    log_context: str
+
+# MITRE ATT&CK Mapping (Cybersecurity Threat Intel)
+MITRE_MAPPING = {
+    "dfs.DataNode": "T1499 - Endpoint Denial of Service",
+    "dfs.FSNamesystem": "T1565 - Data Manipulation",
+    "dfs.DataBlockScanner": "T1485 - Data Destruction",
+    "default": "T1078 - Valid Accounts (Unusual Behavior)"
+}
+
 knowledge_base = [
-    "Rule 1: A high volume of 'DataNode' logs with 'PacketResponder' terminated signals often indicates a network disconnection or a failing hard drive.",
-    "Rule 2: 'WARN' or 'ERROR' levels in the 'dfs.FSNamesystem' component usually point to a corrupted block or a NameNode failure.",
-    "Rule 3: Repeated 'BLOCK* NameSystem.addStoredBlock' logs from the same IP within seconds is a potential denial-of-service attack.",
-    "Rule 4: If the anomaly involves an unauthorized user, refer to the INSA Access Control Policy section 4.2."
+    "Rule 1: High volume of 'DataNode' terminated signals indicates network disconnection or hardware failure.",
+    "Rule 2: 'WARN' in 'dfs.FSNamesystem' points to a corrupted block or NameNode failure.",
+    "Rule 3: Repeated 'BLOCK* NameSystem.addStoredBlock' is a potential denial-of-service attack."
 ]
 
-def explain_alert(log_template, log_component):
+def get_rag_context(log_template, log_component):
     query = f"{log_component} {log_template}"
     vectorizer = TfidfVectorizer(stop_words='english')
     kb_vectors = vectorizer.fit_transform(knowledge_base)
     query_vector = vectorizer.transform([query])
-    
     similarities = cosine_similarity(query_vector, kb_vectors)[0]
-    best_match_idx = similarities.argmax()
-    best_score = similarities[best_match_idx]
-    
-    if best_score > 0.1:
-        return f"Explanation: {knowledge_base[best_match_idx]} (Confidence: {best_score:.2f})"
-    else:
-        return "Explanation: No specific policy rule matches this anomaly. Analyst investigation required."
+    best_idx = similarities.argmax()
+    return knowledge_base[best_idx] if similarities[best_idx] > 0.1 else "No specific rule matched."
 
-# --- FRONTEND SERVING ---
+# --- FRONTEND ---
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 @app.get("/")
 def serve_frontend():
     return FileResponse("app/static/index.html")
 
-# --- API ENDPOINT ---
+# --- PREDICT ENDPOINT ---
 @app.post("/predict")
 def predict_anomaly(log: LogEntry):
     try:
-        # Format input for the model
-        input_df = pd.DataFrame([{
-            'EventTemplate': log.event_template,
-            'Level': log.level,
-            'Component': log.component
-        }])
-        
-        # Predict
+        input_df = pd.DataFrame([{'EventTemplate': log.event_template, 'Level': log.level, 'Component': log.component}])
         prediction = model.predict(input_df)[0]
         
-        # Get explanation if it's an anomaly
-        explanation = "N/A"
+        response = {"prediction": prediction, "explanation": "Normal behavior detected.", "mitre_tactic": "N/A"}
+        
         if prediction == 'Anomaly':
-            explanation = explain_alert(log.event_template, log.component)
+            rag_rule = get_rag_context(log.event_template, log.component)
+            mitre = MITRE_MAPPING.get(log.component, MITRE_MAPPING["default"])
             
-        return {
-            "prediction": prediction,
-            "explanation": explanation
-        }
+            prompt = f"""
+            You are an expert Cybersecurity Analyst at INSA. 
+            An anomaly was detected in the logs.
+            Component: {log.component}
+            Level: {log.level}
+            Template: {log.event_template}
+            Rule: {rag_rule}
+            MITRE Tactic: {mitre}
+            
+            Provide a brief, professional 2-sentence incident report explaining the threat and recommending immediate action.
+            """
+            
+            try:
+                chat_completion = client.chat.completions.create(
+                    messages=[{"role": "user", "content": prompt}],
+                    model="llama3-8b-8192",
+                )
+                explanation = chat_completion.choices[0].message.content
+            except Exception as e:
+                explanation = f"Static Rule: {rag_rule} (LLM Offline)"
+                
+            response["explanation"] = explanation
+            response["mitre_tactic"] = mitre
+            
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- CHAT COPILOT ENDPOINT ---
+@app.post("/chat")
+def chat_with_analyst(msg: ChatMessage):
+    try:
+        prompt = f"""
+        You are a helpful Cybersecurity Copilot for INSA. 
+        The user is investigating an anomaly with this context: "{msg.log_context}"
+        The user asks: "{msg.message}"
+        Answer concisely and professionally.
+        """
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama3-8b-8192",
+        )
+        return {"reply": chat_completion.choices[0].message.content}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

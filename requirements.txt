@@ -5,3 +5,5 @@ joblib
 pandas
 scikit-learn
 numpy
+groq==1.7.0
+python-dotenv==1.2.4

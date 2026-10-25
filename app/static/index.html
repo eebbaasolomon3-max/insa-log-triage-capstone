@@ -1,56 +1,103 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INSA Log Triage Dashboard</title>
+    <title>INSA SOC Copilot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; }
-        h1 { color: #38bdf8; text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 10px; }
-        .card { background-color: #1e293b; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; color: #94a3b8; }
-        input, select, textarea { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #475569; border-radius: 4px; background-color: #0f172a; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background-color: #0ea5e9; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
-        button:hover { background-color: #0284c7; }
-        #result { margin-top: 20px; padding: 15px; border-radius: 4px; display: none; font-family: monospace; font-size: 14px; }
-        .anomaly { background-color: #7f1d1d; border: 1px solid #ef4444; color: #fca5a5; }
-        .normal { background-color: #064e3b; border: 1px solid #10b981; color: #6ee7b7; }
+        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(1.3); opacity: 0; } }
+        .pulse-ring { animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>🛡️ INSA Log Triage Dashboard</h1>
-        
-        <div class="card">
-            <form id="logForm">
-                <label>Component</label>
-                <input type="text" id="component" value="dfs.FSNamesystem" required>
-                
-                <label>Level</label>
-                <select id="level">
-                    <option value="INFO">INFO</option>
-                    <option value="WARN" selected>WARN</option>
-                    <option value="ERROR">ERROR</option>
-                </select>
-                
-                <label>Event Template</label>
-                <input type="text" id="event_template" value="BLOCK* NameSystem.addStoredBlock: blockMap updated: <*> is added to <*> size <*>" required>
-                
-                <button type="submit">Analyze Log</button>
-            </form>
-            <div id="result"></div>
+<body class="bg-slate-900 text-slate-200 font-sans antialiased min-h-screen">
+    
+    <nav class="bg-slate-800 border-b border-slate-700 p-4 shadow-lg">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 p-2 rounded-lg">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                </div>
+                <h1 class="text-xl font-bold tracking-wider">INSA SOC <span class="text-blue-500">Copilot</span></h1>
+            </div>
+            <div class="flex items-center space-x-2 text-sm text-green-400">
+                <span class="relative flex h-3 w-3"><span class="pulse-ring absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span></span>
+                <span>API Connected</span>
+            </div>
         </div>
-    </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+        
+        <!-- Left Column: Input -->
+        <div class="lg:col-span-1 bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
+            <h2 class="text-lg font-semibold mb-4 text-white">Log Ingestion</h2>
+            <form id="logForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Component</label>
+                    <input type="text" id="component" value="dfs.FSNamesystem" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Level</label>
+                    <select id="level" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="INFO">INFO</option>
+                        <option value="WARN" selected>WARN</option>
+                        <option value="ERROR">ERROR</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-400 mb-1">Event Template</label>
+                    <textarea id="event_template" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" required>BLOCK* NameSystem.addStoredBlock: blockMap updated: <*> is added to <*> size <*></textarea>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors">Analyze Log</button>
+                <button type="button" id="simulateBtn" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors">▶ Run Simulation</button>
+            </form>
+        </div>
+
+        <!-- Right Column: Results & Chat -->
+        <div class="lg:col-span-2 space-y-6">
+            
+            <!-- Results Panel -->
+            <div id="resultPanel" class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl hidden transition-all duration-500 transform translate-y-4 opacity-0">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-white">Analysis Report</h2>
+                    <span id="predictionBadge" class="px-3 py-1 rounded-full text-sm font-bold"></span>
+                </div>
+                
+                <div class="mb-4">
+                    <p class="text-sm text-slate-400 mb-1">MITRE ATT&CK Tactic:</p>
+                    <p id="mitreText" class="text-red-400 font-bold text-sm"></p>
+                </div>
+
+                <div class="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                    <p class="text-sm text-slate-400 mb-1">LLM Incident Report:</p>
+                    <p id="explanationText" class="text-slate-200 text-sm leading-relaxed"></p>
+                </div>
+            </div>
+
+            <!-- Chat Copilot -->
+            <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
+                <h2 class="text-lg font-semibold mb-4 text-white">🤖 Ask the SOC Copilot</h2>
+                <div id="chatHistory" class="h-32 overflow-y-auto mb-4 bg-slate-900 p-4 rounded-lg border border-slate-700 text-sm space-y-3">
+                    <div class="text-slate-500 italic">Ask me how to mitigate this threat...</div>
+                </div>
+                <div class="flex space-x-2">
+                    <input type="text" id="chatInput" placeholder="e.g. How do I fix this?" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <button type="button" id="chatBtn" class="bg-blue-600 px-6 py-2.5 rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors">Send</button>
+                </div>
+            </div>
+
+        </div>
+    </main>
 
     <script>
-        document.getElementById('logForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const resultDiv = document.getElementById('result');
-            resultDiv.style.display = 'block';
-            resultDiv.className = '';
-            resultDiv.innerHTML = 'Analyzing...';
+        const form = document.getElementById('logForm');
+        const resultPanel = document.getElementById('resultPanel');
 
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            resultPanel.classList.add('hidden', 'translate-y-4', 'opacity-0');
+            
             const payload = {
                 component: document.getElementById('component').value,
                 level: document.getElementById('level').value,
@@ -63,23 +110,64 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                
                 const data = await response.json();
+
+                const badge = document.getElementById('predictionBadge');
                 
+                resultPanel.classList.remove('hidden');
+                setTimeout(() => resultPanel.classList.remove('translate-y-4', 'opacity-0'), 50);
+
                 if (data.prediction === 'Anomaly') {
-                    resultDiv.className = 'anomaly';
-                    resultDiv.innerHTML = `<h3>⚠️ ALERT TRIGGERED</h3>
-                                           <p><strong>Prediction:</strong> ${data.prediction}</p>
-                                           <p><strong>Explanation:</strong> ${data.explanation}</p>`;
+                    badge.className = "px-3 py-1 rounded-full text-sm font-bold bg-red-900 text-red-400 border border-red-700";
+                    badge.innerText = "⚠️ ANOMALY";
+                    document.getElementById('mitreText').innerText = data.mitre_tactic;
                 } else {
-                    resultDiv.className = 'normal';
-                    resultDiv.innerHTML = `<h3>✅ Normal Behavior</h3>
-                                           <p><strong>Prediction:</strong> ${data.prediction}</p>`;
+                    badge.className = "px-3 py-1 rounded-full text-sm font-bold bg-green-900 text-green-400 border border-green-700";
+                    badge.innerText = "✅ NORMAL";
+                    document.getElementById('mitreText').innerText = "N/A";
                 }
+                
+                document.getElementById('explanationText').innerText = data.explanation;
+
             } catch (error) {
-                resultDiv.className = 'anomaly';
-                resultDiv.innerHTML = `<h3>❌ Error</h3><p>Could not connect to the API. Is the server running?</p>`;
+                alert("Error connecting to API.");
             }
+        });
+
+        document.getElementById('chatBtn').addEventListener('click', async () => {
+            const input = document.getElementById('chatInput');
+            const msg = input.value;
+            if(!msg) return;
+            
+            const history = document.getElementById('chatHistory');
+            if(history.innerHTML.includes("italic")) history.innerHTML = ""; // clear placeholder
+            
+            history.innerHTML += `<div class="text-blue-300"><strong>You:</strong> ${msg}</div>`;
+            input.value = '';
+            history.scrollTop = history.scrollHeight;
+            
+            const context = document.getElementById('event_template').value;
+            
+            try {
+                const res = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message: msg, log_context: context})
+                });
+                const data = await res.json();
+                history.innerHTML += `<div class="text-green-300"><strong>Copilot:</strong> ${data.reply}</div>`;
+                history.scrollTop = history.scrollHeight;
+            } catch(e) {
+                history.innerHTML += `<div class="text-red-400">Error connecting to Copilot.</div>`;
+            }
+        });
+
+        // Simulation
+        document.getElementById('simulateBtn').addEventListener('click', function() {
+            document.getElementById('component').value = "dfs.FSNamesystem";
+            document.getElementById('level').value = "WARN";
+            document.getElementById('event_template').value = "BLOCK* NameSystem.addStoredBlock: blockMap updated: <*> is added to <*> size <*>";
+            form.dispatchEvent(new Event('submit'));
         });
     </script>
 </body>
