@@ -107,22 +107,16 @@ async def upload_logs(file: UploadFile = File(...)):
         contents = await file.read()
         df = pd.read_csv(io.BytesIO(contents))
         
-        # Check for required columns
         required_cols = ['EventTemplate', 'Level', 'Component']
         if not all(col in df.columns for col in required_cols):
             raise HTTPException(status_code=400, detail="CSV must contain EventTemplate, Level, and Component columns.")
         
-        # Run predictions on all rows
         predictions = model.predict(df[required_cols])
-        
-        # Count anomalies
         df['Prediction'] = predictions
         anomalies = df[df['Prediction'] == 'Anomaly']
         
         total_logs = len(df)
         total_anomalies = len(anomalies)
-        
-        # Get top 5 anomalies for the UI
         top_alerts = anomalies.head(5).to_dict(orient='records')
         
         return {
@@ -137,8 +131,12 @@ async def upload_logs(file: UploadFile = File(...)):
 @app.post("/chat")
 def chat_with_analyst(msg: ChatMessage):
     try:
+        # Strongly instruct the AI to use clean formatting
         messages = [
-            {"role": "system", "content": f"You are an expert Cybersecurity Copilot for INSA. Log context: '{msg.log_context}'. Answer professionally. Use bullet points for lists."}
+            {
+                "role": "system", 
+                "content": f"You are an expert Cybersecurity Copilot for INSA. Log context: '{msg.log_context}'. Answer professionally. Do NOT use wide Markdown tables. Instead, use bullet points with bold headers for readability. Keep responses concise."
+            }
         ]
         for chat in msg.history:
             messages.append({"role": chat["role"], "content": chat["content"]})
