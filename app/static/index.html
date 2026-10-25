@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Markdown Renderer -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Chart.js for Data Visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 0.5; } 100% { transform: scale(1.3); opacity: 0; } }
         .pulse-ring { animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
@@ -46,12 +48,23 @@
         
         <!-- Left Column: Input -->
         <div class="lg:col-span-1 space-y-6">
-            <!-- File Upload -->
+            <!-- Drag and Drop File Upload -->
             <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
-                <h2 class="text-lg font-semibold mb-4 text-white">Upload Log File (Batch)</h2>
-                <input type="file" id="csvFile" accept=".csv" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer">
-                <button id="uploadBtn" class="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors">Analyze CSV</button>
-                <div id="uploadResult" class="mt-4 text-sm hidden p-3 bg-slate-900 rounded-lg border border-slate-700"></div>
+                <h2 class="text-lg font-semibold mb-4 text-white">Batch Processing (CSV)</h2>
+                
+                <div id="dropZone" class="border-2 border-dashed border-slate-600 rounded-xl p-6 text-center cursor-pointer hover:border-blue-500 hover:bg-slate-800/50 transition-all">
+                    <svg class="mx-auto h-10 w-10 text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <p class="text-sm text-slate-400">Drag & drop your CSV here, or <span class="text-blue-500 font-bold">browse</span></p>
+                    <input type="file" id="csvFile" accept=".csv" class="hidden">
+                </div>
+                
+                <p id="fileNameDisplay" class="text-xs text-slate-500 mt-2 text-center hidden"></p>
+                <button id="uploadBtn" class="w-full mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors hidden">Analyze File</button>
+                
+                <!-- Chart Container (Hidden initially) -->
+                <div id="chartContainer" class="mt-4 bg-slate-900 p-4 rounded-lg border border-slate-700 hidden h-48 flex justify-center items-center relative">
+                    <canvas id="anomalyChart"></canvas>
+                </div>
             </div>
 
             <!-- Single Log Input -->
@@ -138,18 +151,54 @@
         const chatForm = document.getElementById('chatForm');
         let conversationHistory = [];
 
-        // --- BATCH UPLOAD LOGIC ---
-        document.getElementById('uploadBtn').addEventListener('click', async () => {
-            const fileInput = document.getElementById('csvFile');
+        // --- DRAG AND DROP LOGIC ---
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('csvFile');
+        const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const uploadBtn = document.getElementById('uploadBtn');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-500', 'bg-slate-800/50');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-blue-500', 'bg-slate-800/50');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500', 'bg-slate-800/50');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect();
+            }
+        });
+
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect() {
+            if (fileInput.files.length > 0) {
+                fileNameDisplay.textContent = `Selected: ${fileInput.files[0].name}`;
+                fileNameDisplay.classList.remove('hidden');
+                uploadBtn.classList.remove('hidden');
+            }
+        }
+
+        // --- BATCH UPLOAD & CHART LOGIC ---
+        let chartInstance = null;
+
+        uploadBtn.addEventListener('click', async () => {
             const file = fileInput.files[0];
-            if (!file) { alert("Please select a CSV file first."); return; }
+            if (!file) return;
 
             const formData = new FormData();
             formData.append("file", file);
 
-            const resultDiv = document.getElementById('uploadResult');
-            resultDiv.classList.remove('hidden');
-            resultDiv.innerHTML = `<span class="text-blue-400 animate-pulse">Processing batch logs...</span>`;
+            uploadBtn.textContent = "Processing...";
+            uploadBtn.disabled = true;
 
             try {
                 const res = await fetch('/upload', { method: 'POST', body: formData });
@@ -157,13 +206,37 @@
                 
                 if (!res.ok) throw new Error(data.detail || "Upload failed");
 
-                resultDiv.innerHTML = `
-                    <p class="text-white font-bold mb-2">Batch Complete!</p>
-                    <p class="text-slate-300">Total Logs Analyzed: <span class="font-bold text-white">${data.total_logs}</span></p>
-                    <p class="text-red-400">Anomalies Detected: <span class="font-bold">${data.total_anomalies}</span></p>
-                    <p class="text-xs text-slate-500 mt-2">Check the chat to investigate threats.</p>
-                `;
+                // Show Chart Container
+                const chartContainer = document.getElementById('chartContainer');
+                chartContainer.classList.remove('hidden');
 
+                // Destroy old chart if it exists
+                if (chartInstance) { chartInstance.destroy(); }
+
+                // Render Chart
+                const ctx = document.getElementById('anomalyChart').getContext('2d');
+                chartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Normal', 'Anomalies'],
+                        datasets: [{
+                            data: [data.total_logs - data.total_anomalies, data.total_anomalies],
+                            backgroundColor: ['#10b981', '#ef4444'],
+                            borderColor: '#1e293b',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#cbd5e1' } },
+                            title: { display: true, text: `Batch Results (${data.total_logs} Logs)`, color: '#cbd5e1' }
+                        }
+                    }
+                });
+
+                // Auto-fill single log form with the first anomaly
                 if (data.total_anomalies > 0) {
                     const firstAlert = data.top_alerts[0];
                     document.getElementById('component').value = firstAlert.Component;
@@ -173,7 +246,10 @@
                 }
 
             } catch (err) {
-                resultDiv.innerHTML = `<span class="text-red-400">Error: ${err.message}</span>`;
+                alert(`Error: ${err.message}`);
+            } finally {
+                uploadBtn.textContent = "Analyze File";
+                uploadBtn.disabled = false;
             }
         });
 
@@ -245,7 +321,6 @@
 
                 const replyText = data.reply ? data.reply : `Error: ${data.detail || 'Could not reach LLM'}`;
                 
-                // Use marked.parse() to render the Markdown beautifully
                 const aiBubble = `<div class="flex items-start"><div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 mr-3 font-bold text-xs">AI</div><div class="bg-slate-700 text-slate-200 px-4 py-3 rounded-2xl rounded-tl-none max-w-[85%] text-sm leading-relaxed shadow-sm markdown-body">${marked.parse(replyText)}</div></div>`;
                 chatHistory.innerHTML += aiBubble;
                 chatHistory.scrollTop = chatHistory.scrollHeight;
