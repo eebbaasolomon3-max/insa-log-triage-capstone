@@ -1,18 +1,21 @@
-# INSA AI Engineering Capstone: Log Anomaly Detection & Alert Triage
+# 🛡️ INSA AI Engineering Capstone: Log Anomaly Detection & Alert Triage
+**Student:** Eba Solomon | **Program:** INSA Summer Camp, 5th Batch
 
-**Student:** Eba Solomon
-**Program:** INSA Summer Camp, 5th Batch (AI Engineering Track)
+An end-to-end MLOps pipeline that detects anomalies in HDFS system logs and uses Retrieval-Augmented Generation (RAG) to explain *why* an alert was triggered, reducing analyst alert fatigue.
 
-## Problem Statement
-Security analysts face alert fatigue due to high volumes of system logs and a high false-positive rate in basic detectors. This project provides an end-to-end pipeline to detect anomalous log events, rank them by threat level, and provide a cited, RAG-based explanation for *why* an alert was flagged.
+## 🚀 What I Built (Key Achievements)
+- **Exploratory Data Analysis (EDA):** Cleaned and parsed raw HDFS logs, discovering a massive class imbalance (only 2% anomalies) that breaks standard accuracy metrics.
+- **Machine Learning Pipeline:** Built a leak-proof `scikit-learn` pipeline using TF-IDF for text log templates and One-Hot Encoding for categorical features. Trained a `RandomForestClassifier` using `class_weight='balanced'` to prioritize catching rare anomalies.
+- **RAG Explainability Layer:** Implemented a lightweight semantic search using `Cosine Similarity` to match flagged anomalies against a curated security knowledge base, returning human-readable explanations with confidence scores.
+- **MLOps & Serving:** Deployed the trained model as a production-ready web API using **FastAPI** and **Uvicorn**, complete with Pydantic input validation to prevent malformed data attacks.
+- **Security & Documentation:** Added a strict `.gitignore` to prevent raw data leaks, and documented a formal Model Card detailing limitations and ethical use.
 
-## Architecture
-1. **Data Processing:** HDFS log data parsed and cleaned using Pandas.
-2. **Machine Learning:** A Random Forest Classifier (via Scikit-Learn `Pipeline`) trained on TF-IDF text features and categorical features (`Level`, `Component`). Class imbalance handled via `class_weight='balanced'`.
-3. **Explainability (RAG):** A lightweight retrieval system that matches triggered anomalies against a curated knowledge base of security rules using Cosine Similarity.
-4. **Serving:** A FastAPI web server that exposes a `/predict` endpoint for real-time inference.
+## 🛠️ Tech Stack
+*   **Data & ML:** Python, Pandas, Scikit-Learn (Random Forest, TF-IDF)
+*   **API & Deployment:** FastAPI, Uvicorn, Pydantic
+*   **Environment:** Jupyter Notebook, Git
 
-## Setup Instructions
+## ⚙️ Quick Start (How to Run)
 To reproduce this environment locally:
 
 1. **Clone the repository:**
