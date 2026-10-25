@@ -1,4 +1,4 @@
-kk# 🛡️ INSA AI Engineering Capstone: Log Anomaly Detection & Threat Intelligence Copilot
+🛡️ INSA AI Engineering Capstone: Log Anomaly Detection & Threat Intelligence Copilot
 
 **Student:** Eba Solomon | **Program:** INSA Summer Camp, 5th Batch (AI Engineering Track)
 
