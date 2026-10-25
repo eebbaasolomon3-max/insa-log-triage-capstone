@@ -1,6 +1,6 @@
 ## 🌐 Live Demo
 👉 **[Click here to test the Live Interactive Dashboard](https://insa-log-triage-capstone.onrender.com)** 👈
-*(Note: Hosted on a free cloud tier, it may take 50 seconds to wake up on the first visit).*
+
 # 🛡️ INSA AI Engineering Capstone: Log Anomaly Detection & Alert Triage
 **Student:** Eba Solomon | **Program:** INSA Summer Camp, 5th Batch
 
