@@ -104,6 +104,11 @@
                 </div>
                 
                 <div class="mb-4">
+                    <p class="text-sm text-slate-400 mb-1">Detection Engine:</p>
+                    <p id="methodText" class="text-blue-400 font-bold text-sm"></p>
+                </div>
+
+                <div class="mb-4">
                     <p class="text-sm text-slate-400 mb-1">MITRE ATT&CK Tactic:</p>
                     <p id="mitreText" class="text-red-400 font-bold text-sm"></p>
                 </div>
@@ -206,14 +211,11 @@
                 
                 if (!res.ok) throw new Error(data.detail || "Upload failed");
 
-                // Show Chart Container
                 const chartContainer = document.getElementById('chartContainer');
                 chartContainer.classList.remove('hidden');
 
-                // Destroy old chart if it exists
                 if (chartInstance) { chartInstance.destroy(); }
 
-                // Render Chart
                 const ctx = document.getElementById('anomalyChart').getContext('2d');
                 chartInstance = new Chart(ctx, {
                     type: 'doughnut',
@@ -236,7 +238,6 @@
                     }
                 });
 
-                // Auto-fill single log form with the first anomaly
                 if (data.total_anomalies > 0) {
                     const firstAlert = data.top_alerts[0];
                     document.getElementById('component').value = firstAlert.Component;
@@ -285,6 +286,7 @@
                     badge.innerText = "✅ NORMAL";
                     document.getElementById('mitreText').innerText = "N/A";
                 }
+                document.getElementById('methodText').innerText = data.method;
                 document.getElementById('explanationText').innerText = data.explanation;
             } catch (error) {
                 alert("Error connecting to API.");

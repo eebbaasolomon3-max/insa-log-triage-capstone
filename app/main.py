@@ -19,12 +19,15 @@ app = FastAPI(title="INSA SOC Copilot API")
 # Initialize Groq Client
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# Load Model
+# Load Models (Supervised & Unsupervised)
 MODEL_PATH = "models/baseline_rf_pipeline.pkl"
-if os.path.exists(MODEL_PATH):
+ISO_MODEL_PATH = "models/iso_forest_pipeline.pkl"
+
+if os.path.exists(MODEL_PATH) and os.path.exists(ISO_MODEL_PATH):
     model = joblib.load(MODEL_PATH)
+    iso_model = joblib.load(ISO_MODEL_PATH)
 else:
-    raise RuntimeError(f"Model not found at {MODEL_PATH}")
+    raise RuntimeError("Models not found. Please ensure both models are trained and saved.")
 
 class LogEntry(BaseModel):
     component: str
@@ -36,7 +39,6 @@ class ChatMessage(BaseModel):
     log_context: str
     history: list = []
 
-# MITRE ATT&CK Mapping
 MITRE_MAPPING = {
     "dfs.DataNode": "T1499 - Endpoint Denial of Service",
     "dfs.FSNamesystem": "T1565 - Data Manipulation",
@@ -66,23 +68,42 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 def serve_frontend():
     return FileResponse("app/static/index.html")
 
-# --- PREDICT ENDPOINT (Single Log) ---
+# --- PREDICT ENDPOINT (Dual Model) ---
 @app.post("/predict")
 def predict_anomaly(log: LogEntry):
     try:
         input_df = pd.DataFrame([{'EventTemplate': log.event_template, 'Level': log.level, 'Component': log.component}])
-        prediction = model.predict(input_df)[0]
         
-        if log.level == "ERROR":
-            prediction = "Anomaly"
+        # 1. Supervised Prediction (Random Forest)
+        rf_pred = model.predict(input_df)[0]
+        
+        # 2. Unsupervised Prediction (Isolation Forest) - returns 1 for normal, -1 for anomaly
+        iso_pred = iso_model.predict(input_df)[0]
+        
+        # Determine final prediction
+        is_anomaly = False
+        detection_method = "None"
+        
+        if rf_pred == 'Anomaly':
+            is_anomaly = True
+            detection_method = "Supervised AI (Known Threat)"
+        elif iso_pred == -1:
+            is_anomaly = True
+            detection_method = "Unsupervised AI (Zero-Day Threat)"
+        elif log.level == "ERROR": # Demo override
+            is_anomaly = True
+            detection_method = "Rule-Based (High Severity)"
 
-        response = {"prediction": prediction, "explanation": "Normal behavior detected.", "mitre_tactic": "N/A"}
+        response = {"prediction": "Normal", "explanation": "Normal behavior detected.", "mitre_tactic": "N/A", "method": "None"}
         
-        if prediction == 'Anomaly':
+        if is_anomaly:
+            response["prediction"] = "Anomaly"
+            response["method"] = detection_method
+            
             rag_rule = get_rag_context(log.event_template, log.component)
             mitre = MITRE_MAPPING.get(log.component, MITRE_MAPPING["default"])
             
-            prompt = f"You are a Cybersecurity Analyst. Anomaly detected in {log.component}. Log: {log.event_template}. Rule: {rag_rule}. MITRE: {mitre}. Provide a brief 2-sentence incident report."
+            prompt = f"You are a Cybersecurity Analyst. An anomaly was detected via {detection_method}. Component: {log.component}. Log: {log.event_template}. Rule: {rag_rule}. MITRE: {mitre}. Provide a brief 2-sentence incident report."
             
             try:
                 chat_completion = client.chat.completions.create(
@@ -100,7 +121,7 @@ def predict_anomaly(log: LogEntry):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- BATCH UPLOAD ENDPOINT (CSV) ---
+# --- BATCH UPLOAD ENDPOINT ---
 @app.post("/upload")
 async def upload_logs(file: UploadFile = File(...)):
     try:
@@ -111,10 +132,15 @@ async def upload_logs(file: UploadFile = File(...)):
         if not all(col in df.columns for col in required_cols):
             raise HTTPException(status_code=400, detail="CSV must contain EventTemplate, Level, and Component columns.")
         
-        predictions = model.predict(df[required_cols])
-        df['Prediction'] = predictions
-        anomalies = df[df['Prediction'] == 'Anomaly']
+        # Run both models
+        rf_preds = model.predict(df[required_cols])
+        iso_preds = iso_model.predict(df[required_cols])
         
+        # Combine results (Anomaly if EITHER model says so)
+        df['Prediction'] = 'Normal'
+        df.loc[(rf_preds == 'Anomaly') | (iso_preds == -1), 'Prediction'] = 'Anomaly'
+        
+        anomalies = df[df['Prediction'] == 'Anomaly']
         total_logs = len(df)
         total_anomalies = len(anomalies)
         top_alerts = anomalies.head(5).to_dict(orient='records')
@@ -131,12 +157,8 @@ async def upload_logs(file: UploadFile = File(...)):
 @app.post("/chat")
 def chat_with_analyst(msg: ChatMessage):
     try:
-        # Strongly instruct the AI to use clean formatting
         messages = [
-            {
-                "role": "system", 
-                "content": f"You are an expert Cybersecurity Copilot for INSA. Log context: '{msg.log_context}'. Answer professionally. Do NOT use wide Markdown tables. Instead, use bullet points with bold headers for readability. Keep responses concise."
-            }
+            {"role": "system", "content": f"You are an expert Cybersecurity Copilot for INSA. Log context: '{msg.log_context}'. Answer professionally. Do NOT use wide Markdown tables. Instead, use bullet points with bold headers for readability."}
         ]
         for chat in msg.history:
             messages.append({"role": chat["role"], "content": chat["content"]})
