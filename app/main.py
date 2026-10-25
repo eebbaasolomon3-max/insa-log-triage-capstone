@@ -33,6 +33,7 @@ class LogEntry(BaseModel):
 class ChatMessage(BaseModel):
     message: str
     log_context: str
+    history: list = [] # This remembers the conversation
 
 # MITRE ATT&CK Mapping
 MITRE_MAPPING = {
@@ -113,15 +114,23 @@ def predict_anomaly(log: LogEntry):
 @app.post("/chat")
 def chat_with_analyst(msg: ChatMessage):
     try:
-        prompt = f"""
-	You are a helpful Cybersecurity Copilot for INSA. 
-	The user is investigating an anomaly with this context: "{msg.log_context}"
-	The user asks: "{msg.message}"
-	Answer concisely and professionally. 
-	Use bullet points for lists. Do NOT use markdown tables.
-	"""
+        # 1. Start with the System Persona
+        messages = [
+            {
+                "role": "system", 
+                "content": f"You are an expert Cybersecurity Copilot for INSA. The current log context is: '{msg.log_context}'. Answer professionally. If the user asks an off-topic question, politely remind them you are a cybersecurity assistant focused on analyzing this log. Use bullet points for lists."
+            }
+        ]
+        
+        # 2. Add the conversation history so the AI remembers the context
+        for chat in msg.history:
+            messages.append({"role": chat["role"], "content": chat["content"]})
+            
+        # 3. Add the user's new message
+        messages.append({"role": "user", "content": msg.message})
+
         chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             model="openai/gpt-oss-20b",
         )
         return {"reply": chat_completion.choices[0].message.content}
